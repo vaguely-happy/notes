@@ -1,0 +1,103 @@
+embed 
+<drac2>
+a,text, args = &ARGS&,"",argparse(&ARGS&)
+
+
+
+using(
+    notelib="e566d79c-3f15-4853-a5ac-e93dcfd95e04"
+)
+notebook = notelib.getDefault()
+
+# Quick bit of version upgrade code here when the other stuff is tested
+
+	
+
+title = notelib.baseTitle()
+
+if not get('notes'):
+	character().set_cvar_nx('notes','{"Default":"notes_default"}')
+	character().set_cvar_nx('notes_default','[]')
+keylist = notelib.getKeylist()
+
+if "u" in args or "use" in args:
+	# parse for the matching book
+	bookarg = args.last("use") if "use" in args else args.last("u")
+	notebook = notelib.setDefault(bookarg)
+	title += " (" + notebook + ")"
+elif "b" in args or "book" in args:
+	# parse for the matching book
+	bookarg = args.last("book") if "book" in args else args.last("b")
+	notebook = notelib.parseBooks(bookarg,keylist)
+	title += " (" + notebook + ")"
+elif "c" in args or "create" in args:
+	bookarg = args.last("create") if "create" in args else args.last("c")
+	if not bookarg:
+		err("A name must be specified to create a new notebook")
+	if not notelib.isBook(bookarg):
+		# We did not find the notebook so create it
+		notelib.createBook(bookarg)
+		notebook = bookarg
+		title += " (" + notebook + ")"
+	else :
+		notebook = notelib.parseBooks(bookarg,keylist)
+		err("An existing notebook of name " + notebook + "was found. Will not create a duplicate or fuzzy match")
+elif "r" in args or "remove" in args:
+	# parse for the matching book
+	bookarg = args.last("remove") if "remove" in args else args.last("r")
+	notebook = notelib.removeBook(bookarg)
+	title += " (" + notebook + ")"
+	
+if "ts" in args or "timestamp" in args:
+	# Ignore if notebook was being removed - the remove will tidy it up anyway
+	if not "r" in args and not "remove" in args:
+		tsarg = args.last("timestamp") if "timestamp" in args else args.last("ts")
+		if "off" in tsarg.lower():
+			# We are removing the timestamp option
+			notelib.unsetTimestamp(notebook)
+		else :
+			notelib.setTimestamp(notebook)
+			
+if "title" in args:
+	title = args.last("title")
+	notelib.setTitle(title)
+elif "notitle" in args:
+	notelib.unsetTitle() 
+	
+if "d" in args or "del" in args:
+	delnum = args.last("del") if "del" in args else args.last("d")
+	notelib.delNotes(notebook,delnum)
+
+if "n" in args or "new" in args:
+	setdate = args.last("date") if "date" in args else ""
+	if "e" in args or "edit" in args:
+		number = args.last("edit") if "edit" in args else args.last("e")
+		newtext = args.last("note") if "note" in args else args.last("n")
+		notelib.editNotesNum(notebook,number,newtext,setdate)
+	else:
+		newnotes = args.get("n") + args.get("new")
+		notelib.addNotes(notebook,newnotes,setdate)	
+
+
+if "help" in args or "?" in args:
+	text += get_gvar("b94df90c-27c8-4b9d-bb89-5e615b4afba9").replace("{alias}",ctx.prefix+ctx.alias).replace("{title}",notelib.baseTitle())
+elif "admin" in args:
+	text += get_gvar("2c6852f7-cecd-487a-abc0-7b0a025c050e").replace("{pre}",ctx.prefix).replace("{title}",notelib.baseTitle())
+else:
+	page = 1
+	filter = None
+	if "p" in args or "page" in args:
+		page = args.last("page") if "page" in args else args.last("p")
+	if "f" in args or "find" in args:
+		filter = args.last("find") if "find" in args else args.last("f")
+	text += notelib.readNotes(notebook, filter, page)
+	
+if "l" in args or "list" in args:
+	text += notelib.readBooks()
+
+</drac2>
+-title "{{title}}"
+-desc "{{text}}"
+-footer "{{ctx.prefix+ctx.alias}} by vaguely_happy#3490"
+-color <color>
+-thumb <image>

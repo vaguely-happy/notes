@@ -1,0 +1,392 @@
+# notelib
+# Data handling for character notes
+#
+# The data structure for this is in two parts. 
+# notes cvar is a dict {"default": "notes_default", "Friends": "notes_1", "Bizarre": "notes_2"}
+# notebook cvars are simple arrays ["first note","second note"]
+#
+# Fuzzy logic algorithm is deliberately the exact same as from the !bag alias. Done for consistency across similar aliases.
+#
+
+#Define constants
+
+DEFAULT_BOOK = "Default"
+NOTES_TS_CVAR = "notes_timestamp"
+NOTES_NTS_CVAR = "notes_ntimestamp"
+NOTE_ALWAYS_TS = "notes_timestamp"
+TITLE = "Character Notes"
+TITLE_CONF = "notes_title"
+NOTES_PERPAGE = "notes_per_page"
+
+ch = character()
+
+# Return a list of the book names which are keys to the notes cvar
+def getKeylist() :
+	keylist = list(load_json(ch.cvars.get('notes', {})))
+	return keylist
+
+# Return the list of notes for a notebook if it exists. Will error if not
+# While the keys are in the notes cvar the actual values are in one cvar per notebook
+def getNoteVar(notekey) :
+	try:
+		notevar = load_json(ch.cvars.get('notes', {})).get(notekey)
+		notedata = load_json(ch.cvars.get(notevar,[]))
+		return notedata
+	except :
+		err("Failed for note key " + notekey)
+
+# Create or update a notebook array for the corresponding notes key		
+def setNoteVar(notekey,notesArray) :
+	try:
+		notevar = load_json(ch.cvars.get('notes', {})).get(notekey)
+		ch.set_cvar(notevar,dump_json(notesArray))
+	except :
+		err("Failed set for note key " + notekey)
+		
+# Read and format a notebook into display text. Will use optional filter text	
+def readNotes(notekey, filter = None, page = 1) :
+	notedata = getNoteVar(notekey)
+	nText = "__" + notekey + "__\n"
+	num = 1
+	count = 0
+	length = len(notedata)
+	pageint = page
+	startnum = 0
+	try:
+		pageint = int(page)
+		if pageint > 1 and length > perPage():
+			startnum = ((pageint-1) * perPage())
+	except:
+		pageint = 1
+	
+	for x in notedata:
+		pad = ".  " if num < 10 else ". "
+		if len(nText) + len(x) > 3900:
+			nText += "\n*Page truncated due to size of notes.*"
+			break
+		if isInFilter(x,filter) and num > startnum:
+			nText += num + pad + x + "\n"
+			count += 1
+		num += 1
+		if count >= perPage():
+			break
+	if length > perPage():
+		nText += "\n*Page " + str(pageint) + "/" + ceil(length/perPage()) + "*"
+	return(nText)
+
+# Simplified version of the same filter algorith for single entry
+def isInFilter(text,filter) :
+	if filter:
+		if filter == text:
+			return True
+		elif filter.lower() == text.lower():
+			return true
+		elif filter in text:
+			return True
+		elif filter.lower() in text.lower():
+			return True
+		else:
+			return False
+	else:
+		return True
+
+# Fuzzy matching from text to a specific full name of a notebook in the key list
+def parseBooks(bookname,keylist) :
+	book = [b for b in keylist if b == bookname]
+	if not book:
+		book = [b for b in keylist if bookname.lower() == b.lower()]
+	if not book:
+		book = [b for b in keylist if bookname in b]
+	if not book:
+		book = [b for b in keylist if bookname.lower() in b.lower()]
+	if book:
+		return book[0]
+	else:
+		if isBook(DEFAULT_BOOK):
+			return DEFAULT_BOOK
+		else: # Should be a legacy issue from v1.0
+			return "default"
+		
+# Fuzzy matching test to see if a book exists
+def isBook(bookname) :
+	keylist = getKeylist()
+	book = [b for b in keylist if b == bookname]
+	if not book:
+		book = [b for b in keylist if bookname.lower() == b.lower()]
+	if not book:
+		book = [b for b in keylist if bookname in b]
+	if not book:
+		book = [b for b in keylist if bookname.lower() in b.lower()]
+	if book:
+		return True
+	else:
+		return False
+		
+# Top level add note function, will append the new note then calls a function to persist it		
+def addNotes(bookname,notesArray,setdate) :
+	notedata = getNoteVar(bookname)
+	notedata += applyTimestamp(bookname,notesArray,setdate)
+	setNoteVar(bookname,notedata)
+
+
+# Top level delete note function. Will try to delete by number but if the param is not a number falls through to delete by fuzzy matching
+def delNotes(bookname,param) :
+	try :
+		delNotesNum(bookname,int(param))
+	except :
+		delNotesName(bookname,param)
+
+# Delete note by index. Note that the display numbers start at 1 rather than 0 so we subtract 1 to turn the argument into an index number	
+def delNotesNum(bookname,number) :
+	oldNotes = getNoteVar(bookname)
+	try:
+		numint = int(number) - 1
+		oldNotes.pop(int(numint))	
+	except:
+		err("Error deleting the note, please enter a valid entry to delete: number entered " + number)
+	setNoteVar(bookname,oldNotes)
+
+# Delete note by fuzzy text match
+def delNotesName(bookname, notetext) :
+	keylist = getNoteVar(bookname)
+	note = [b for b in keylist if b == notetext]
+	if not note:
+		note = [b for b in keylist if notetext.lower() == b.lower()]
+	if not note:
+		note = [b for b in keylist if notetext in b]
+	if not note:
+		note = [b for b in keylist if notetext.lower() in b.lower()]
+	if note:
+		keylist.remove(note[0])
+		setNoteVar(bookname,keylist)
+
+# Create a new notebook. Needs to add to the notes cvar and also create the new notebook cvar		
+def createBook(bookname) :
+	try:
+		notedefs = load_json(ch.cvars.get('notes', {}))
+		newnotevar = getUniqueKey()
+		notedefs[bookname] = newnotevar
+		ch.set_cvar('notes',dump_json(notedefs))
+		ch.set_cvar(newnotevar,"[]")
+	except:
+		err("Failed to create new book for key " + bookname)
+
+# Top level delete notebook function. Will attempt to delete by number and falls through to delete by fuzzy text match if the param is not a number
+def removeBook(param) :
+	try :
+		removeBookNum(int(param))
+	except :
+		removeBookName(param)
+
+# Delete a notebook by index number. Removes from the key list, takes the cvar name from that dict so we can delete the notebook cvar
+def removeBookNum(booknum) :
+	try:
+		notedefs = load_json(character().cvars.get('notes', {}))
+		keylist = getKeylist()
+		notekey = keylist[booknum]
+		if canDelete(notekey):
+			cvarkey = notedefs.pop(notekey)
+			character().set_cvar('notes',dump_json(notedefs))
+			character().delete_cvar(cvarkey)
+			deleteDependent(notekey)
+	except:
+		err("Number " + booknum + " did not have matching entry")
+
+# Delete a notebook by fuzzy text match. Removes from the key list, takes the cvar name from that dict so we can delete the notebook cvar
+def removeBookName(bookname) :
+	notebook = parseBooks(bookname,getKeylist())
+	if isBook(bookname) and canDelete(notebook) :
+		try:
+	
+			notedefs = load_json(ch.cvars.get('notes', {}))
+			cvarkey = notedefs.get(notebook)
+			notedefs.pop(notebook)
+			ch.set_cvar('notes',dump_json(notedefs))
+			ch.delete_cvar(cvarkey)
+			deleteDependent(notebook)
+			return True
+		except:
+			err("Failed to remove book with key " + bookname)
+	else:
+		err("Unable to find a note book to remove called " + bookname)
+			
+			
+# Check to see if this is the built in default book - which we do not allow to be deleted
+def canDelete(bookname):
+	# Case insensitive because of the version 1.0 spelling
+	return bookname.lower() not in DEFAULT_BOOK.lower()
+			
+# Delete dependent items on a notebook
+def deleteDependent(bookname) :
+	unsetTimestamp(bookname)
+	unsetNoTimestamp(bookname)
+	if bookname in getDefault():
+		ch.delete_cvar('notes_def_book')
+			
+			
+# Read and format a list of the notebooks into display text	
+def readBooks() :
+	keylist = load_json(ch.cvars.get('notes', {})).keys()
+	num = 1
+	text = "\n__Notebooks__\n\n"
+	for x in keylist:
+		if x != "default":
+			text += num + ". " + x + "\n"
+			num += 1
+	return text
+
+# Generate a unique key for creation of a new notebook. Note will ensure unique across all cvars just in case!
+# No pagination for notebook output so we are limiting to 20 of them.
+def getUniqueKey() :
+	keylist =  list(ch.cvars)
+	for a in range(1, 20):
+		trykey = "notes_" + str(a)
+		if not trykey in keylist:
+			return trykey
+	err("You cannot have more than 20 notebooks at once")
+	
+# Return the current default notebook
+def getDefault() :
+	defaultnotes = ch.get_cvar('notes_def_book', DEFAULT_BOOK)
+	if defaultnotes in getKeylist():
+		return defaultnotes
+	else:
+		return "default" # backwards compatability for version 1.0
+	
+# Set the current default notebook
+def setDefault(newDefault) :
+	bookname = parseBooks(newDefault,getKeylist())
+	if bookname == DEFAULT_BOOK and newDefault != DEFAULT_BOOK :
+		err("Unable to find " + newDefault + " to set as default")
+	else :
+		ch.set_cvar('notes_def_book', bookname)
+	return bookname
+
+# Add a notebook to the timestamp notebook list
+def setTimestamp(notebook) :
+	tsdata = load_json(ch.cvars.get(NOTES_TS_CVAR, []))
+	if notebook not in tsdata:
+		tsdata.append(notebook)
+		ch.set_cvar(NOTES_TS_CVAR,dump_json(tsdata))
+	if serverTimestamp():
+		unsetNoTimestamp(notebook)
+	
+# Remove a notebook from the timestamp notebook list
+def unsetTimestamp(notebook) :
+	tsdata = load_json(ch.cvars.get(NOTES_TS_CVAR, []))
+	if notebook in tsdata:
+		tsdata.remove(notebook)
+		ch.set_cvar(NOTES_TS_CVAR,dump_json(tsdata))
+	if serverTimestamp():
+		setNoTimestamp(notebook)
+		
+# Add a notebook to the no timestamp notebook list
+def setNoTimestamp(notebook) :
+	tsdata = load_json(ch.cvars.get(NOTES_NTS_CVAR, []))
+	if notebook not in tsdata:
+		tsdata.append(notebook)
+		ch.set_cvar(NOTES_NTS_CVAR,dump_json(tsdata))
+	
+# Remove a notebook from the no timestamp notebook list
+def unsetNoTimestamp(notebook) :
+	tsdata = load_json(ch.cvars.get(NOTES_NTS_CVAR, []))
+	if notebook in tsdata:
+		tsdata.remove(notebook)
+		ch.set_cvar(NOTES_NTS_CVAR,dump_json(tsdata))
+		
+# Check if a timestamp is to be prepended to messages in a book. Returns a boolean
+def useTimestamp(notebook) :
+	if serverTimestamp() :
+		tsdata = load_json(ch.cvars.get(NOTES_NTS_CVAR, []))
+		if notebook in tsdata:
+			return False
+		else:
+			return True
+	else:
+		tsdata = load_json(ch.cvars.get(NOTES_TS_CVAR, []))
+		if notebook in tsdata:
+			return True
+		else:
+			return False
+			
+# Check if server timestamp default is set
+def serverTimestamp() :
+	return get_svar(NOTE_ALWAYS_TS)
+	
+# Conditionally apply the timestamp to a set of new notes
+def applyTimestamp(bookname,notesArray,setdate) :
+	if not useTimestamp(bookname) :
+		return notesArray
+	else :
+		timestamp = setdate + " " if setdate else "<t:" + int(time()) + ":D> "
+		ts_notesArray = [timestamp + s for s in notesArray]
+		return ts_notesArray
+		
+# Have a configurable title for the notes
+def baseTitle() :
+	if ch.get_cvar(TITLE_CONF):
+		return ch.get_cvar(TITLE_CONF)
+	elif get_svar(TITLE_CONF) :
+		return get_svar(TITLE_CONF)
+	else:
+		return TITLE
+		
+# Set a manual title for the character
+def setTitle(title) :
+	ch.set_cvar(TITLE_CONF,title)
+
+# Remove manual title for the character
+def unsetTitle() :
+	if ch.get_cvar(TITLE_CONF):
+		ch.delete_cvar(TITLE_CONF)
+		
+# Have a configurable number of notes per page
+def perPage() :
+	if get_svar(NOTES_PERPAGE) :
+		return int(get_svar(NOTES_PERPAGE))
+	else:
+		return 25
+		
+# Edit note by index. Note that the display numbers start at 1 rather than 0 so we subtract 1 to turn the argument into an index number	
+def editNotesNum(bookname,number,text,setdate) :
+	oldNotes = getNoteVar(bookname)
+	try:
+		numint = int(number) - 1
+		timestamp = ""
+		if setdate:
+			timestamp = setdate
+		else:
+			timestamp = oldNotes[numint][0:16] if "<t:" in oldNotes[numint] else ""
+			timestamp = extract_date(oldNotes[numint]) if not timestamp else timestamp
+		oldNotes[numint] = timestamp + text	
+	except:
+		err("Error editing the note, please enter a valid entry to delete: number entered " + number)
+	setNoteVar(bookname,oldNotes)
+
+# Extract a date from the start of a note to help preserve manual dates on edits			
+def extract_date(input_string):
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    date_found = False
+
+    # Split the input string into words
+    words = input_string.split()
+
+    # Check if the first word is a valid date (numeric)
+    if words[0].isdigit():
+        day = words[0]
+        # Check if the second word is a valid month
+        if words[1] in months:
+            month = words[1]
+            # Check if the third word is a valid year (numeric and four digits)
+            if words[2].isdigit() and len(words[2]) == 4:
+                year = words[2]
+                date_found = True
+
+    # If a valid date is found, construct a new string with the date
+    if date_found:
+        extracted_date = f"{day} {month} {year} "
+    else:
+        extracted_date = ""
+
+    return extracted_date
+    

@@ -1,0 +1,39 @@
+embed 
+<drac2>
+a,text, args = &ARGS&,"",argparse(&ARGS&)
+
+# Test for at least one argument
+arg1 = (&ARGS& + ["N/A"])[:1]
+
+using(
+    notelib="e566d79c-3f15-4853-a5ac-e93dcfd95e04"
+)
+notebook = notelib.getDefault()
+
+
+	
+
+title = notelib.baseTitle()
+
+
+if not notelib.isBook(notebook):
+	# We did not find the notebook so create it
+	notelib.createBook(notebook)
+
+
+if "N/A" not in arg1:
+	notetext = [" ".join(a)]
+	notelib.addNotes(notebook,notetext,"")	
+
+
+page = 1
+filter = None
+text += notelib.readNotes(notebook, filter, page)
+	
+
+</drac2>
+-title "{{title}}"
+-desc "{{text}}"
+-footer "{{ctx.prefix+ctx.alias}} by vaguely_happy"
+-color <color>
+-thumb <image>

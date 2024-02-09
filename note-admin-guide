@@ -1,0 +1,31 @@
+**Admin Guide for {title}**
+
+*This alias will work well for most servers with the default settings but for some servers you might want to make adjustments.*
+
+__Changing the number of items per page__
+
+If your users are making very lengthy entries then you may find that the default number of entries per page of 25 is too high. This can in some cases cause the list to be tructated or to exceed the Avrae limits. To set the limit to a different value set an svar called notes_per_page
+
+For example to set the entries per page to 10 set
+
+`{pre}svar notes_per_page 10`
+
+To reset the alias to its default setting simply delete the svar
+
+__Changing the alias name__
+
+Changing alias name can be done by the usual method with `{pre}servalias`. This will change the name, if you also want to change the name where it is displayed inside the alias itself then set the svar notes_title
+
+For example to set the display name within the alias to 'Character Legends' set
+
+`{pre}svar notes_title Character Legends`
+
+Do not use quotes within the title as this will upset the display within the alias. To revert to the default settings simple delete the svar
+
+__Setting timestamp as the default__
+
+Timestamps are usually set by the user for individual notebooks. If you wish all entries to be timestamped by default set the svar notes_timestamp. The value you set it to does not matter, the svar being present will change the default behaviour.
+
+`{pre}svar notes_timestamp True`
+
+To undo the change in default behaviour simply delete the svar

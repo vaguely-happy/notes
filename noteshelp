@@ -1,0 +1,48 @@
+**Help Guide for {title}**
+
+*Notebooks are here for you to make notes and records about all sorts of things; favourite codes you want to remember, campaign notes, beasts your druid has seen so they can wildshape them. Anything you like. You have a default notebook always available and you can add new notebooks whenever you like*
+
+__Using your notebook__
+
+*Called with no arguments this alias will simply display your notes*
+`-n/-new *text in quotes*` Will add a new note, multiple notes can be added
+`-e/-edit #` When used with a new note will instead edit the existing numbered note
+`-d/-del #` Will delete the numbered note
+`-d/-del *text*` Will delete the first note matching the text
+`-f/-find *text*` Will find notes which fuzzy match on the text
+`-p/-page #` Show the numbered page, if there are multiple pages of notes
+`-date <date>` Will take the text in <date> and over-ride the timestamp on a new note.
+
+__Using multiple notebooks__
+
+*You have a default notebook, these commands allow you to use other notebooks*
+`-b/-book *book name*` Will use the named book for this note action
+`-u/-use *book name*` Will switch to the named book until you switch again
+`-r/-remove #` Will remove the numbered notebook
+`-r/-remove *book name*` Will remove the named notebook
+`-c/-create *book name*` Will create a new notebook
+`-ts/-timestamp [off]` Add timestamps to future notes in this notebook. The off option will disable timestamps in this notebook.
+`-l/-list` List all your notebooks
+
+__Help guides__
+
+`{alias} help` Show this help guide
+`{alias} admin` Show the admin user guide
+
+__Examples__
+
+*Create multiple notes at once*
+`{alias} -n '!animate for animate object spell' -n '!a chronal - use chronal shift and roll dice'`
+
+*Edit an existing note*
+`!note -e 3 -n "Met Alice in the tavern and learned of her dead mother"`
+
+*Create a new notebook with a note in it*
+`{alias} -c 'Monsters seen' -n 'Blue Dragon'`
+
+*Create a new notebook with timestamps*
+`{alias} -c 'Downtime tasks' -ts`
+
+*Switch to using a new notebook from now on*
+`{alias} -u 'Downtime tasks'`
+
